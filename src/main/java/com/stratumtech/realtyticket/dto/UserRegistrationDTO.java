@@ -8,9 +8,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserRegistrationDTO {
-    private String role; // "AGENT" или "REGIONAL_ADMIN"
-    private Integer regionId; // Выбор региона
-    private String referralCode; // Опциональный реферальный код для AGENT
+    private String role;
+    private Integer regionId;
+    private String referralCode;
     private String name;
     private String patronymic;
     private String surname;
@@ -18,5 +18,6 @@ public class UserRegistrationDTO {
     private String phone;
     private String telegramTag;
     private String preferChannel;
+    private String resume;
 
 }
