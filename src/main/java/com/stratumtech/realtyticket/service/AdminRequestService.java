@@ -94,26 +94,35 @@ public class AdminRequestService {
     private boolean hasAccess(Map<String, Object> request, String userRole,
                               Integer userRegionId, String userReferralCode) {
         String requestRole = (String) request.get("role");
+        String normalizedUserRole = userRole != null && userRole.startsWith("ROLE_")
+            ? userRole.substring(5)
+            : userRole;
+        System.out.println("[hasAccess] requestRole=" + requestRole + ", userRole=" + userRole + " (normalized: " + normalizedUserRole + "), userRegionId=" + userRegionId + ", userReferralCode=" + userReferralCode + ", request=" + request);
 
         if ("REGIONAL_ADMIN".equals(requestRole)) {
-            return "ADMIN".equals(userRole);
+            boolean result = "ADMIN".equals(normalizedUserRole);
+            System.out.println("[hasAccess] REGIONAL_ADMIN: " + result);
+            return result;
         }
 
         if ("AGENT".equals(requestRole)) {
-            if (!"REGIONAL_ADMIN".equals(userRole)) {
+            if (!"REGIONAL_ADMIN".equals(normalizedUserRole)) {
+                System.out.println("[hasAccess] AGENT: userRole is not REGIONAL_ADMIN");
                 return false;
             }
-
             String requestReferralCode = (String) request.get("referralCode");
             Integer requestRegionId = (Integer) request.get("regionId");
-
             if (requestReferralCode != null && !requestReferralCode.isEmpty()) {
-                return requestReferralCode.equals(userReferralCode);
+                boolean result = requestReferralCode.equals(userReferralCode);
+                System.out.println("[hasAccess] AGENT: referralCode match: " + result);
+                return result;
             }
-
-            return requestRegionId != null && requestRegionId.equals(userRegionId);
+            boolean result = requestRegionId != null && requestRegionId.equals(userRegionId);
+            System.out.println("[hasAccess] AGENT: regionId match: " + result);
+            return result;
         }
 
+        System.out.println("[hasAccess] Unknown role: false");
         return false;
     }
 } 
