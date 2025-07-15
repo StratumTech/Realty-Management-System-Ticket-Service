@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @RestController
 @RequestMapping("/api/v1/admin-requests")
@@ -19,21 +21,27 @@ public class AdminRequestController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> getAdminRequests(
-            @RequestHeader("X-Role") String userRole,
-            @RequestHeader(value = "X-Region-Id", required = false) Integer userRegionId,
-            @RequestHeader(value = "X-Referral-Code", required = false) String userReferralCode) {
-
-        List<Map<String, Object>> requests = adminRequestService.getAdminRequests(userRole, userRegionId, userReferralCode);
+    public ResponseEntity<List<Map<String, Object>>> getAdminRequests() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userRole = authentication.getAuthorities().stream().findFirst().map(Object::toString).orElse(null);
+        String userUuid = (String) authentication.getPrincipal();
+        Object detailsObj = authentication.getDetails();
+        Integer regionId = null;
+        String referralCode = null;
+        if (detailsObj instanceof Map) {
+            Map<?, ?> details = (Map<?, ?>) detailsObj;
+            regionId = (Integer) details.get("regionId");
+            referralCode = (String) details.get("referralCode");
+        }
+        List<Map<String, Object>> requests = adminRequestService.getAdminRequests(userRole, regionId, referralCode);
         return ResponseEntity.ok(requests);
     }
 
     @PostMapping("/{id}/approve")
-    public ResponseEntity<?> approveRequest(
-            @PathVariable UUID id,
-            @RequestHeader("X-User-Uuid") UUID approverUuid) {
-        
-        boolean success = adminRequestService.approveRequest(id, approverUuid);
+    public ResponseEntity<?> approveRequest(@PathVariable UUID id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String approverUuid = (String) authentication.getPrincipal();
+        boolean success = adminRequestService.approveRequest(id, UUID.fromString(approverUuid));
         if (success) {
             return ResponseEntity.ok("Request approved successfully");
         } else {
