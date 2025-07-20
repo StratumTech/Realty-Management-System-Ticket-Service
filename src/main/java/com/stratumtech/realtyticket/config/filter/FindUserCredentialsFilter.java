@@ -14,13 +14,14 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class FindUserCredentialsFilter extends OncePerRequestFilter {
     private static final String HEADER_USER_ROLE = "X-USER-ROLE";
     private static final String HEADER_USER_UUID = "X-USER-UUID";
-    private static final String HEADER_USER_REGION_ID = "X-USER-REGION-ID";
-    private static final String HEADER_USER_REFERRAL_CODE = "X-USER-REFERRAL-CODE";
+    private static final String HEADER_ADMIN_REGION_ID = "X-ADMIN-REGION-ID";
+    private static final String HEADER_ADMIN_REFERRAL_CODE = "X-ADMIN-REFERRAL-CODE";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -28,8 +29,8 @@ public class FindUserCredentialsFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String roleHeader = request.getHeader(HEADER_USER_ROLE);
         String uuidHeader = request.getHeader(HEADER_USER_UUID);
-        String regionIdHeader = request.getHeader(HEADER_USER_REGION_ID);
-        String referralCodeHeader = request.getHeader(HEADER_USER_REFERRAL_CODE);
+        String regionIdHeader = request.getHeader(HEADER_ADMIN_REGION_ID);
+        String referralCodeHeader = request.getHeader(HEADER_ADMIN_REFERRAL_CODE);
 
 
         if ((roleHeader != null && !roleHeader.isBlank()) &&
@@ -38,11 +39,14 @@ public class FindUserCredentialsFilter extends OncePerRequestFilter {
 
             var authority = new SimpleGrantedAuthority(role);
             Map<String, Object> details = new HashMap<>();
-            details.put("regionId", regionIdHeader != null && !regionIdHeader.isBlank() ? Integer.valueOf(regionIdHeader) : null);
-            details.put("referralCode", referralCodeHeader);
+
+            if(role.endsWith("REGION_ADMIN")){
+                details.put("adminRegionId", regionIdHeader);
+                details.put("adminReferralCode", referralCodeHeader);
+            }
 
             var authentication = new UsernamePasswordAuthenticationToken(
-                    uuidHeader, null, Collections.singletonList(authority));
+                    UUID.fromString(uuidHeader), null, Collections.singletonList(authority));
             authentication.setDetails(details);
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
