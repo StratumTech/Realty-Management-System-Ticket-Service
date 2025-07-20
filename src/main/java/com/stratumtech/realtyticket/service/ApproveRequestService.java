@@ -1,36 +1,39 @@
 package com.stratumtech.realtyticket.service;
 
-import com.stratumtech.realtyticket.dto.AgentApprovalDTO;
-import com.stratumtech.realtyticket.dto.RegionalAdminApprovalDTO;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.RedisTemplate;
+
+import com.stratumtech.realtyticket.dto.AgentApprovalDTO;
+import com.stratumtech.realtyticket.dto.RegionalAdminApprovalDTO;
+
+import com.stratumtech.realtyticket.producer.AdminApprovalProducer;
+import com.stratumtech.realtyticket.producer.AgentApprovalProducer;
+
 @Service
+@RequiredArgsConstructor
 public class AdminRequestService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private final KafkaProducerService kafkaProducerService;
+    private final AdminApprovalProducer adminApprovalProducer;
+    private final AgentApprovalProducer agentApprovalProducer;
+    private final ObjectMapper mapper;
 
-    public AdminRequestService(RedisTemplate<String, Object> redisTemplate, KafkaProducerService kafkaProducerService) {
-        this.redisTemplate = redisTemplate;
-        this.kafkaProducerService = kafkaProducerService;
-    }
-
-    public List<Map<String, Object>> getAdminRequests(String userRole, Integer userRegionId, String userReferralCode) {
-        List<Map<String, Object>> allRequests = redisTemplate.keys("admin_request:*")
+    public List<Map<String, Object>> getAdminRequests() {
+        return redisTemplate.keys("admin_request:*")
                 .stream()
-                .map(key -> (Map<String, Object>) redisTemplate.opsForValue().get(key))
+                .map(key -> redisTemplate.opsForValue().get(key))
+                .map(obj -> mapper.convertValue(obj, new TypeReference<Map<String, Object>>() {}))
                 .filter(request -> request != null && "PENDING".equals(request.get("status")))
-                .collect(Collectors.toList());
-
-        return allRequests.stream()
-                .filter(request -> hasAccess(request, userRole, userRegionId, userReferralCode))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public boolean approveRequest(UUID requestId, UUID approverUuid) {
@@ -89,40 +92,5 @@ public class AdminRequestService {
         redisTemplate.delete(redisKey);
         
         return true;
-    }
-
-    private boolean hasAccess(Map<String, Object> request, String userRole,
-                              Integer userRegionId, String userReferralCode) {
-        String requestRole = (String) request.get("role");
-        String normalizedUserRole = userRole != null && userRole.startsWith("ROLE_")
-            ? userRole.substring(5)
-            : userRole;
-        System.out.println("[hasAccess] requestRole=" + requestRole + ", userRole=" + userRole + " (normalized: " + normalizedUserRole + "), userRegionId=" + userRegionId + ", userReferralCode=" + userReferralCode + ", request=" + request);
-
-        if ("REGIONAL_ADMIN".equals(requestRole)) {
-            boolean result = "ADMIN".equals(normalizedUserRole);
-            System.out.println("[hasAccess] REGIONAL_ADMIN: " + result);
-            return result;
-        }
-
-        if ("AGENT".equals(requestRole)) {
-            if (!"REGIONAL_ADMIN".equals(normalizedUserRole)) {
-                System.out.println("[hasAccess] AGENT: userRole is not REGIONAL_ADMIN");
-                return false;
-            }
-            String requestReferralCode = (String) request.get("referralCode");
-            Integer requestRegionId = (Integer) request.get("regionId");
-            if (requestReferralCode != null && !requestReferralCode.isEmpty()) {
-                boolean result = requestReferralCode.equals(userReferralCode);
-                System.out.println("[hasAccess] AGENT: referralCode match: " + result);
-                return result;
-            }
-            boolean result = requestRegionId != null && requestRegionId.equals(userRegionId);
-            System.out.println("[hasAccess] AGENT: regionId match: " + result);
-            return result;
-        }
-
-        System.out.println("[hasAccess] Unknown role: false");
-        return false;
     }
 } 
