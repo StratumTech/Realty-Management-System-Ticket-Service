@@ -1,14 +1,12 @@
 package com.stratumtech.realtyticket.dto;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-
 import java.util.UUID;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 public class AgentApprovalDTO extends BaseUserApprovalDTO {
     private String referralCode; // Из заявки (может быть null)
     private Integer regionId; // Регион агента
