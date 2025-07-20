@@ -1,12 +1,13 @@
 package com.stratumtech.realtyticket.service;
 
-import com.stratumtech.realtyticket.dto.UserRegistrationDTO;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
+
+import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.RedisTemplate;
+
+import com.stratumtech.realtyticket.dto.UserRegistrationDTO;
 
 @Service
 public class RegistrationService {

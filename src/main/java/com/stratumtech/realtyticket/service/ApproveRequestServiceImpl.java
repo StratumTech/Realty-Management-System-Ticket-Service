@@ -3,12 +3,12 @@ package com.stratumtech.realtyticket.service;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.HashOperations;
+
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.RedisTemplate;
 
@@ -20,25 +20,37 @@ import com.stratumtech.realtyticket.producer.AgentApprovalProducer;
 
 @Service
 @RequiredArgsConstructor
-public class AdminRequestService {
+public class ApproveRequestService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final AdminApprovalProducer adminApprovalProducer;
     private final AgentApprovalProducer agentApprovalProducer;
     private final ObjectMapper mapper;
 
-    public List<Map<String, Object>> getAdminRequests() {
+    public List<Map<String, Object>> getRequests() {
         return redisTemplate.keys("admin_request:*")
                 .stream()
                 .map(key -> redisTemplate.opsForValue().get(key))
-                .map(obj -> mapper.convertValue(obj, new TypeReference<Map<String, Object>>() {}))
+                .map(obj -> mapper.convertValue(obj, new TypeReference<Map<String, Object>>() { }))
                 .filter(request -> request != null && "PENDING".equals(request.get("status")))
+                .toList();
+    }
+
+    public List<Map<String, Object>> getRejectedRequests(){
+        return redisTemplate.keys("admin_rejected_request:*")
+                .stream()
+                .map(key -> redisTemplate.opsForValue().get(key))
+                .map(obj -> mapper.convertValue(obj, new TypeReference<Map<String, Object>>() { }))
+                .filter(request -> request != null && "REJECTED".equals(request.get("status")))
                 .toList();
     }
 
     public boolean approveRequest(UUID requestId, UUID approverUuid) {
         String redisKey = "admin_request:" + requestId;
-        Map<String, Object> request = (Map<String, Object>) redisTemplate.opsForValue().get(redisKey);
+        Map<String, Object> request =  mapper.convertValue(
+                redisTemplate.opsForValue().get(redisKey),
+                new TypeReference<>() { }
+        );
         
         if (request == null || !"PENDING".equals(request.get("status"))) {
             return false;
@@ -47,6 +59,7 @@ public class AdminRequestService {
         String role = (String) request.get("role");
         
         if ("AGENT".equals(role)) {
+
             AgentApprovalDTO agentApprovalDTO = new AgentApprovalDTO();
             agentApprovalDTO.setName((String) request.get("name"));
             agentApprovalDTO.setPatronymic((String) request.get("patronymic"));
@@ -57,9 +70,9 @@ public class AdminRequestService {
             agentApprovalDTO.setPreferChannel((String) request.get("preferChannel"));
             agentApprovalDTO.setReferralCode((String) request.get("referralCode"));
             agentApprovalDTO.setRegionId((Integer) request.get("regionId"));
-            agentApprovalDTO.setApproverAdminUuid(approverUuid); // UUID администратора, который одобрил
+            agentApprovalDTO.setApproverAdminUuid(approverUuid);
 
-            kafkaProducerService.sendAgentApproval(agentApprovalDTO);
+            agentApprovalProducer.sendAgentApproval(agentApprovalDTO);
             
         } else if ("REGIONAL_ADMIN".equals(role)) {
             RegionalAdminApprovalDTO regionalAdminApprovalDTO = new RegionalAdminApprovalDTO();
@@ -73,7 +86,7 @@ public class AdminRequestService {
             regionalAdminApprovalDTO.setRegionId((Integer) request.get("regionId"));
             regionalAdminApprovalDTO.setReferralCode((String) request.get("referralCode"));
 
-            kafkaProducerService.sendRegionalAdminApproval(regionalAdminApprovalDTO);
+            adminApprovalProducer.sendRegionalAdminApproval(regionalAdminApprovalDTO);
         }
 
         redisTemplate.delete(redisKey);
@@ -81,12 +94,29 @@ public class AdminRequestService {
         return true;
     }
 
-    public boolean rejectRequest(UUID requestId) {
+    public boolean rejectRequest(UUID requestId, UUID rejecterUuid) {
         String redisKey = "admin_request:" + requestId;
-        Map<String, Object> request = (Map<String, Object>) redisTemplate.opsForValue().get(redisKey);
-        
+        Map<String, Object> request =  mapper.convertValue(
+                redisTemplate.opsForValue().get(redisKey),
+                new TypeReference<>() { }
+        );
+
         if (request == null || !"PENDING".equals(request.get("status"))) {
             return false;
+        }
+
+        String role = (String) request.get("role");
+
+        if ("AGENT".equals(role)) {
+
+            UUID rejectRequestId = UUID.randomUUID();
+            request.put("id", rejectRequestId);
+            request.put("status", "REJECTED");
+            request.put("rejecterUuid", rejecterUuid);
+
+            String newRedisKey = "admin_rejected_request:" + requestId;
+            redisTemplate.opsForValue().set(newRedisKey, request);
+
         }
 
         redisTemplate.delete(redisKey);
