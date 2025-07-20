@@ -4,20 +4,19 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.HashMap;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import com.stratumtech.realtyticket.dto.UserRegistrationDTO;
 
 @Service
-public class RegistrationService {
+@RequiredArgsConstructor
+public class RegistrationServiceImpl implements RegistrationService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    public RegistrationService(RedisTemplate<String, Object> redisTemplate) {
-        this.redisTemplate = redisTemplate;
-    }
-
+    @Override
     public Map<String, Object> register(UserRegistrationDTO dto) {
         UUID requestId = UUID.randomUUID();
         Map<String, Object> requestMap = new HashMap<>();

@@ -20,13 +20,14 @@ import com.stratumtech.realtyticket.producer.AgentApprovalProducer;
 
 @Service
 @RequiredArgsConstructor
-public class ApproveRequestService {
+public class ApproveRequestServiceImpl implements ApproveRequestService{
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final AdminApprovalProducer adminApprovalProducer;
     private final AgentApprovalProducer agentApprovalProducer;
     private final ObjectMapper mapper;
 
+    @Override
     public List<Map<String, Object>> getRequests() {
         return redisTemplate.keys("admin_request:*")
                 .stream()
@@ -36,6 +37,7 @@ public class ApproveRequestService {
                 .toList();
     }
 
+    @Override
     public List<Map<String, Object>> getRejectedRequests(){
         return redisTemplate.keys("admin_rejected_request:*")
                 .stream()
@@ -45,6 +47,7 @@ public class ApproveRequestService {
                 .toList();
     }
 
+    @Override
     public boolean approveRequest(UUID requestId, UUID approverUuid) {
         String redisKey = "admin_request:" + requestId;
         Map<String, Object> request =  mapper.convertValue(
@@ -94,6 +97,7 @@ public class ApproveRequestService {
         return true;
     }
 
+    @Override
     public boolean rejectRequest(UUID requestId, UUID rejecterUuid) {
         String redisKey = "admin_request:" + requestId;
         Map<String, Object> request =  mapper.convertValue(
